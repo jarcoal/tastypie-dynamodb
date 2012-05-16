@@ -5,19 +5,20 @@ class DynamoKeyField(ApiField):
 	"""
 	Root Dynamo Key Field
 	"""
-	def __init__(self, updateable=False, value=None, **k):
+	def __init__(self, value=None, **k):
 		super(DynamoKeyField, self).__init__(**k)
-		
-		self.updateable = updateable
 		self.value = value
-	
 
 	def hydrate(self, bundle):
+		#if this is a create, and there is a specified value for this key, use it
 		if bundle.request.method == 'POST' and self.value:
 			return self.value(bundle) if hasattr(self.value, '__call__') else self.value
-		elif bundle.request.method == 'PUT' and not self.updateable:
+		
+		#dynamo keys can't be updated
+		elif bundle.request.method == 'PUT':
 			return None
 		
+		#fall into line
 		return super(DynamoKeyField, self).hydrate(bundle)
 
 
