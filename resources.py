@@ -46,30 +46,51 @@ class DynamoResource(Resource):
 		#ship
 		return urls
 
+
+	def _dynamo_update_or_insert(self, bundle, params=None, update=False):
+		#check for params
+		params = params or {}
+	
+		#hydrate the bundle
+		bundle = self.full_hydrate(bundle)
+		
+		#create our item
+		item = self.table.new_item(**params)
+		
+		#extract our attributes from the bundle
+		attrs = bundle.obj.to_dict()
+		
+		#loop and add the valid values
+		for key, val in attrs.items():
+			if val is None:
+				continue
+			
+			item[key] = val
+		
+		#commit to db
+		if update:
+			item.save()
+		else:
+			item.put()
+
+		#wrap the item and store it for return
+		bundle.obj = DynamoObject(item)
+		
+		return bundle
+
+
 	def obj_update(self, bundle, request=None, **k):
 		"""
 		Updates an item in Dynamo
 		"""
-	
-		#get the item
-		try:
-			item = self.table.get_item(consistent_read=self.consistent_read, **self.hydrate_pk_slug(k['pk']))
-		except DynamoDBKeyNotFoundError:
-			raise Http404
-	
-		#bundle = self.full_hydrate(bundle)
-	
-		#update
-		item.update(bundle.data)
-		
-		#save
-		item.put()
-		
-		#store
-		bundle.obj = DynamoObject(item)
-		
-		#ship
-		return bundle
+		return self._dynamo_update_or_insert(bundle, params=self.hydrate_pk_slug(k['pk']), update=True)
+
+
+	def obj_create(self, bundle, request=None, **k):
+		"""
+		Creates an object in Dynamo
+		"""
+		return self._dynamo_update_or_insert(bundle)
 
 
 	def obj_get(self, request=None, **k):
@@ -92,34 +113,6 @@ class DynamoResource(Resource):
 	
 		item = self.table.new_item(**self.hydrate_pk_slug(k['pk']))
 		item.delete()
-
-	
-	def obj_create(self, bundle, request=None, **k):
-		"""
-		Creates an object in Dynamo
-		"""
-	
-		#schema = self.table.schema
-		
-		bundle.obj = DynamoObject()
-		bundle = self.full_hydrate(bundle)
-
-		#get attrs for new item
-		attrs = bundle.obj.to_dict()
-
-		#dynamo doesn't allow None's, so take them out
-		for key, val in attrs.items():
-			if val is None:
-				del attrs[key]
-
-		#create the item
-		item = self.table.new_item(attrs=attrs)
-		
-		#save
-		item.put()
-		
-		#ship
-		return bundle
 
 
 	def rollback(self):
