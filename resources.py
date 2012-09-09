@@ -14,15 +14,9 @@ class DynamoResource(Resource):
 	Inherit from DynamoHashResource or DynamoHashRangeResource.
 	"""
 
-	@property
-	def table(self):
-		if not hasattr(self._meta, 'table'):
-			raise Exception('No table provided')
-
-		return self._meta.table
-
-	hash_key_type = property(lambda self: int if self.table.schema.hash_key_type == 'N' else str)
-	consistent_read = property(lambda self: self._meta.consistent_read if hasattr(self._meta, 'consistent_read') else False)
+	def __init__(self, *a, **k):
+		super(DynamoResource, self).__init__(*a, **k)
+		self.hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
 	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
@@ -35,13 +29,11 @@ class DynamoResource(Resource):
 		})
 
 
-
-
 	def _dynamo_update_or_insert(self, bundle, params=None, update=False):
 		params = params or {}
 
 		bundle = self.full_hydrate(bundle)
-		item = self.table.new_item(**params)
+		item = self._meta.table.new_item(**params)
 		
 		#extract our attributes from the bundle
 		attrs = bundle.obj.to_dict()
@@ -85,7 +77,7 @@ class DynamoResource(Resource):
 		"""
 	
 		try:
-			item = self.table.get_item(consistent_read=self.consistent_read, **self.hydrate_pk_slug(k['pk']))
+			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **self.hydrate_pk_slug(k['pk']))
 		except DynamoDBKeyNotFoundError:
 			raise Http404
 			
@@ -97,7 +89,7 @@ class DynamoResource(Resource):
 		Deletes an object in Dynamo
 		"""
 	
-		item = self.table.new_item(**self.hydrate_pk_slug(k['pk']))
+		item = self._meta.table.new_item(**self.hydrate_pk_slug(k['pk']))
 		item.delete()
 
 
@@ -120,7 +112,7 @@ class DynamoHashResource(DynamoResource):
 		return { 'hash_key': self.hash_key_type(pk) }
 
 	def dehydrate_pk_slug(self, obj):
-		return str(getattr(obj, self.table.schema.hash_key_name))
+		return str(getattr(obj, self._meta.table.schema.hash_key_name))
 
 
 class DynamoHashRangeResource(DynamoResource):
@@ -128,16 +120,15 @@ class DynamoHashRangeResource(DynamoResource):
 	Resource to use for Dynamo tables that have hash and range keys.
 	"""
 
-	range_key_type = property(lambda self: int if self.table.schema.range_key_type == 'N' else str)
+	def __init__(self, *a, **k):
+		super(DynamoHashRangeResource, self).__init__(*a, **k)
 
-	@property
-	def primary_key_delimeter(self):
-		delimeter = self._meta.primary_key_delimeter if hasattr(self._meta, 'primary_key_delimeter') else ':'
+		self.range_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
+		self.primary_key_delimeter = self._meta.primary_key_delimeter if hasattr(self._meta, 'primary_key_delimeter') else ':'
 		
-		if delimeter in (';', '&', '?'):
-			raise Exception('"%" is not a valid delimeter.' % delimeter)		
-		
-		return delimeter
+		if self.primary_key_delimeter in (';', '&', '?'):
+			raise Exception('"%" is not a valid delimeter.' % self.primary_key_delimeter)	
+
 
 	def hydrate_pk_slug(self, pk):
 		keys = {}
@@ -153,14 +144,14 @@ class DynamoHashRangeResource(DynamoResource):
 
 	def dehydrate_pk_slug(self, obj):
 		keys = [
-			str(getattr(obj, self.table.schema.hash_key_name)),
-			str(getattr(obj, self.table.schema.range_key_name)),
+			str(getattr(obj, self._meta.table.schema.hash_key_name)),
+			str(getattr(obj, self._meta.table.schema.range_key_name)),
 		]
 	
 		return self.primary_key_delimeter.join(keys)
 
 	def obj_get_list(self, request=None, **k):
-		schema = self.table.schema
+		schema = self._meta.table.schema
 	
 		#work out the hash key
 		hash_key = request.GET.get(schema.hash_key_name, None)
@@ -172,7 +163,7 @@ class DynamoHashRangeResource(DynamoResource):
 		params = {
 			'hash_key': self.hash_key_type(hash_key),
 			'request_limit': self._meta.limit,
-			'consistent_read': self.consistent_read,
+			'consistent_read': self._meta.consistent_read,
 			'scan_index_forward': self._meta.scan_index_forward if hasattr(self._meta, 'scan_index_forward') else True,
 		}
 		
@@ -207,7 +198,7 @@ class DynamoHashRangeResource(DynamoResource):
 
 
 		#perform the query
-		results = self.table.query(**params)
+		results = self._meta.table.query(**params)
 
 		#return the results
 		return [DynamoObject(obj) for obj in results]
