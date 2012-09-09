@@ -21,18 +21,34 @@ class DynamoResource(Resource):
 
 		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
+	def dispatch_detail(self, request, **k):
+		"""
+		Ensure that the hash_key is received in the correct type
+		"""
+		k['hash_key'] = self._hash_key_type(k['hash_key'])
+		return super(DynamoResource, self).dispatch_detail(request, **k)
 
-	def full_hydrate(self, *a, **k):
-		bundle = super(DynamoResource, self).full_hydrate(*a, **k)
+	def hydrate(self, *a, **k):
+		bundle = super(DynamoResource, self).hydrate(*a, **k)
 
 		#make sure we get the hash key from the request
 		hash_key_name = self._meta.table.schema.hash_key_name
-		setattr(bundle.obj, hash_key_name, bundle.data.get(hash_key_name, None))
+		hash_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
+		hash_key_value = bundle.data.get(hash_key_name, None)
+
+		if hash_key_value:
+			hash_key_value = hash_key_type(hash_key_value)
+
+		setattr(bundle.obj, hash_key_name, hash_key_value)
 
 		return bundle
 
+	# def dehydrate(self, *a, **k):
+	# 	bundle = super(DynamoResource, self).dehydrate(*a, **k)
+	# 	return bundle
+
 	#
-	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
+	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),]
 	get_resource_uri = lambda self, bundle: self._build_reverse_url('api_dispatch_detail', kwargs=self.get_resource_uri_kwargs(bundle))
 
 	def get_resource_uri_kwargs(self, bundle):
@@ -88,9 +104,9 @@ class DynamoResource(Resource):
 		"""
 		Gets an object in Dynamo
 		"""
-	
+
 		try:
-			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **self._hydrate_pk_slug(k['pk']))
+			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **k)
 		except DynamoDBKeyNotFoundError:
 			raise Http404
 			
@@ -138,6 +154,15 @@ class DynamoHashRangeResource(DynamoResource):
 		
 		if self._meta.primary_key_delimeter in (';', '&', '?'):
 			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
+
+
+	def dispatch_detail(self, request, **k):
+		"""
+		Ensure that the range_key is received in the correct type
+		"""
+		k['range_key'] = self._range_key_type(k['range_key'])
+		return super(DynamoHashRangeResource, self).dispatch_detail(request, **k)
+
 
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)%s(?P<range_key>.+)/$' % (self._meta.resource_name, self._meta.primary_key_delimeter), self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
 
