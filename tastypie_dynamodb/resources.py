@@ -18,8 +18,8 @@ class DynamoResource(Resource):
 		super(DynamoResource, self).__init__(*a, **k)
 		self._meta.consistent_read = getattr(self._meta, 'consistent_read', False)
 		self._meta.object_class = DynamoObject if self._meta.object_class is None else self._meta.object_class
-
 		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
+
 
 	def dispatch_detail(self, request, **k):
 		"""
@@ -28,20 +28,21 @@ class DynamoResource(Resource):
 		k['hash_key'] = self._hash_key_type(k['hash_key'])
 		return super(DynamoResource, self).dispatch_detail(request, **k)
 
+
 	def hydrate(self, *a, **k):
 		bundle = super(DynamoResource, self).hydrate(*a, **k)
 
 		#make sure we get the hash key from the request
 		hash_key_name = self._meta.table.schema.hash_key_name
-		hash_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
 		hash_key_value = bundle.data.get(hash_key_name, None)
 
 		if hash_key_value:
-			hash_key_value = hash_key_type(hash_key_value)
+			hash_key_value = _hash_key_type(hash_key_value)
 
 		setattr(bundle.obj, hash_key_name, hash_key_value)
 
 		return bundle
+
 
 	# def dehydrate(self, *a, **k):
 	# 	bundle = super(DynamoResource, self).dehydrate(*a, **k)
@@ -50,19 +51,13 @@ class DynamoResource(Resource):
 	#
 	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),]
 	get_resource_uri = lambda self, bundle: self._build_reverse_url('api_dispatch_detail', kwargs=self.get_resource_uri_kwargs(bundle))
+	get_resource_uri_kwargs = lambda self, bundle: { 'api_name': self._meta.api_name, 'resource_name': self._meta.resource_name, 'hash_key': str(getattr(bundle.obj, self._meta.table.schema.hash_key_name)), }
 
-	def get_resource_uri_kwargs(self, bundle):
-		return {
-			'api_name': self._meta.api_name,
-			'resource_name': self._meta.resource_name,
-			'hash_key': str(getattr(bundle.obj, self._meta.table.schema.hash_key_name)),
-		}
-
-	def _dynamo_update_or_insert(self, bundle, params=None, update=False):
-		params = params or {}
+	def _dynamo_update_or_insert(self, bundle, primary_keys=None):
+		primary_keys = primary_keys or {}
 
 		bundle = self.full_hydrate(bundle)
-		item = self._meta.table.new_item(**params)
+		item = self._meta.table.new_item(**primary_keys)
 		
 		#extract our attributes from the bundle
 		attrs = bundle.obj.to_dict()
@@ -74,11 +69,10 @@ class DynamoResource(Resource):
 			
 			item[key] = val
 		
-		#commit to db
-		if update:
-			item.save()
-		else:
-			item.put()
+
+		#if there are pks, this is an update, else it's new
+		item.put() if primary_keys else item.save()
+
 
 		#wrap the item and store it for return
 		bundle.obj = DynamoObject(item)
@@ -90,7 +84,7 @@ class DynamoResource(Resource):
 		"""
 		Issues update command to dynamo, which will create if doesn't exist.
 		"""
-		return self._dynamo_update_or_insert(bundle, params=self._hydrate_pk_slug(k['pk']), update=True)
+		return self._dynamo_update_or_insert(bundle, primary_keys=k)
 
 
 	def obj_create(self, bundle, request=None, **k):
@@ -118,7 +112,7 @@ class DynamoResource(Resource):
 		Deletes an object in Dynamo
 		"""
 	
-		item = self._meta.table.new_item(**self._hydrate_pk_slug(k['pk']))
+		item = self._meta.table.new_item(**k)
 		item.delete()
 
 
@@ -136,9 +130,6 @@ class DynamoHashResource(DynamoResource):
 	"""
 	Resource to use for Dynamo tables that only have a hash primary key.
 	"""
-	
-	_hydrate_pk_slug = lambda self, pk: { 'hash_key': self._hash_key_type(pk) }
-	_dehydrate_pk_slug = lambda self, obj: str(getattr(obj, self._meta.table.schema.hash_key_name))
 
 
 class DynamoHashRangeResource(DynamoResource):
@@ -180,26 +171,6 @@ class DynamoHashRangeResource(DynamoResource):
 
 		return bundle
 
-
-	def _hydrate_pk_slug(self, pk):
-		keys = {}
-		
-		#extract the hash/range from the pk
-		keys['hash_key'], keys['range_key'] = pk.split(self._meta.primary_key_delimeter)
-		
-		#make sure they're in the right format
-		keys['hash_key'] = self._hash_key_type(keys['hash_key'])
-		keys['range_key'] = self._range_key_type(keys['range_key'])
-		
-		return keys
-
-	def _dehydrate_pk_slug(self, obj):
-		keys = [
-			str(getattr(obj, self._meta.table.schema.hash_key_name)),
-			str(getattr(obj, self._meta.table.schema.range_key_name)),
-		]
-	
-		return self._meta.primary_key_delimeter.join(keys)
 
 	def obj_get_list(self, request=None, **k):
 		schema = self._meta.table.schema
