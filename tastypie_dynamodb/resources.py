@@ -16,8 +16,11 @@ class DynamoResource(Resource):
 
 	def __init__(self, *a, **k):
 		super(DynamoResource, self).__init__(*a, **k)
-		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 		self._meta.consistent_read = getattr(self._meta, 'consistent_read', False)
+		self._meta.object_class = DynamoObject if self._meta.object_class is None else self._meta.object_class
+
+		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
+
 
 	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
