@@ -33,14 +33,14 @@ class DynamoResource(Resource):
 
 	#
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
+	get_resource_uri = lambda self, bundle: self._build_reverse_url('api_dispatch_detail', kwargs=self.get_resource_uri_kwargs(bundle))
 
-	def get_resource_uri(self, bundle):
-		return self._build_reverse_url('api_dispatch_detail', kwargs={
-			'resource_name': self._meta.resource_name,
-			'pk': self._dehydrate_pk_slug(bundle.obj),
+	def get_resource_uri_kwargs(self, bundle):
+		return {
 			'api_name': self._meta.api_name,
-		})
-
+			'resource_name': self._meta.resource_name,
+			'hash_key': str(getattr(bundle.obj, self._meta.table.schema.hash_key_name)),
+		}
 
 	def _dynamo_update_or_insert(self, bundle, params=None, update=False):
 		params = params or {}
@@ -140,6 +140,11 @@ class DynamoHashRangeResource(DynamoResource):
 			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
 
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)%s(?P<range_key>.+)/$' % (self._meta.resource_name, self._meta.primary_key_delimeter), self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
+
+	def get_resource_uri_kwargs(self, bundle):
+		resource_kwargs = super(DynamoHashRangeResource, self).get_resource_uri_kwargs(bundle)
+		resource_kwargs['range_key'] = str(getattr(bundle.obj, self._meta.table.schema.range_key_name))
+		return resource_kwargs
 
 	def full_hydrate(self, *a, **k):
 		bundle = super(DynamoHashRangeResource, self).full_hydrate(*a, **k)
