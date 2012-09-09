@@ -22,6 +22,15 @@ class DynamoResource(Resource):
 		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
 
+	def full_hydrate(self, *a, **k):
+		bundle = super(DynamoResource, self).full_hydrate(*a, **k)
+
+		#make sure we get the hash key from the request
+		hash_key_name = self._meta.table.schema.hash_key_name
+		setattr(bundle.obj, hash_key_name, bundle.data.get(hash_key_name, None))
+
+		return bundle
+
 	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
 
@@ -129,6 +138,16 @@ class DynamoHashRangeResource(DynamoResource):
 		
 		if self._meta.primary_key_delimeter in (';', '&', '?'):
 			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
+
+
+	def full_hydrate(self, *a, **k):
+		bundle = super(DynamoHashRangeResource, self).full_hydrate(*a, **k)
+
+		#make sure we get the range key from the request
+		range_key_name = self._meta.table.schema.range_key_name
+		setattr(bundle.obj, range_key_name, bundle.data.get(range_key_name, None))
+
+		return bundle
 
 
 	def _hydrate_pk_slug(self, pk):
