@@ -31,8 +31,8 @@ class DynamoResource(Resource):
 
 		return bundle
 
-	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
-	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
+	#
+	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
 
 	def get_resource_uri(self, bundle):
 		return self._build_reverse_url('api_dispatch_detail', kwargs={
@@ -139,6 +139,7 @@ class DynamoHashRangeResource(DynamoResource):
 		if self._meta.primary_key_delimeter in (';', '&', '?'):
 			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
 
+	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)%s(?P<range_key>.+)/$' % (self._meta.resource_name, self._meta.primary_key_delimeter), self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
 
 	def full_hydrate(self, *a, **k):
 		bundle = super(DynamoHashRangeResource, self).full_hydrate(*a, **k)
