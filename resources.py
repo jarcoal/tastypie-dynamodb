@@ -20,14 +20,12 @@ class DynamoResource(Resource):
 			raise Exception('No table provided')
 
 		return self._meta.table
-	
-	@property
-	def hash_key_type(self):
-		return int if self.table.schema.hash_key_type == 'N' else str
-	
-	@property
-	def consistent_read(self):
-		return self._meta.consistent_read if hasattr(self._meta, 'consistent_read') else False
+
+	hash_key_type = property(lambda self: int if self.table.schema.hash_key_type == 'N' else str)
+	consistent_read = property(lambda self: self._meta.consistent_read if hasattr(self._meta, 'consistent_read') else False)
+
+	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
+	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
 
 	def get_resource_uri(self, bundle):
 		return self._build_reverse_url('api_dispatch_detail', kwargs={
@@ -36,25 +34,13 @@ class DynamoResource(Resource):
 			'api_name': self._meta.api_name,
 		})
 
-	def base_urls(self):
-		#up
-		urls = super(DynamoResource, self).base_urls()
-		
-		#insert our url that allows for the <pk> to have additional symbols
-		urls[3] = url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail')
-		
-		#ship
-		return urls
+
 
 
 	def _dynamo_update_or_insert(self, bundle, params=None, update=False):
-		#check for params
 		params = params or {}
-	
-		#hydrate the bundle
+
 		bundle = self.full_hydrate(bundle)
-		
-		#create our item
 		item = self.table.new_item(**params)
 		
 		#extract our attributes from the bundle
@@ -81,7 +67,7 @@ class DynamoResource(Resource):
 
 	def obj_update(self, bundle, request=None, **k):
 		"""
-		Updates an item in Dynamo
+		Issues update command to dynamo, which will create if doesn't exist.
 		"""
 		return self._dynamo_update_or_insert(bundle, params=self.hydrate_pk_slug(k['pk']), update=True)
 
@@ -142,9 +128,7 @@ class DynamoHashRangeResource(DynamoResource):
 	Resource to use for Dynamo tables that have hash and range keys.
 	"""
 
-	@property
-	def range_key_type(self):
-		return int if self.table.schema.range_key_type == 'N' else str
+	range_key_type = property(lambda self: int if self.table.schema.range_key_type == 'N' else str)
 
 	@property
 	def primary_key_delimeter(self):
