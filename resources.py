@@ -121,17 +121,17 @@ class DynamoHashRangeResource(DynamoResource):
 		super(DynamoHashRangeResource, self).__init__(*a, **k)
 
 		self.range_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
-		self.primary_key_delimeter = self._meta.primary_key_delimeter if hasattr(self._meta, 'primary_key_delimeter') else ':'
+		self._meta.primary_key_delimeter = self._meta.primary_key_delimeter or ':'
 		
-		if self.primary_key_delimeter in (';', '&', '?'):
-			raise Exception('"%" is not a valid delimeter.' % self.primary_key_delimeter)	
+		if self._meta.primary_key_delimeter in (';', '&', '?'):
+			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
 
 
 	def _hydrate_pk_slug(self, pk):
 		keys = {}
 		
 		#extract the hash/range from the pk
-		keys['hash_key'], keys['range_key'] = pk.split(self.primary_key_delimeter)
+		keys['hash_key'], keys['range_key'] = pk.split(self._meta.primary_key_delimeter)
 		
 		#make sure they're in the right format
 		keys['hash_key'] = self.hash_key_type(keys['hash_key'])
@@ -145,7 +145,7 @@ class DynamoHashRangeResource(DynamoResource):
 			str(getattr(obj, self._meta.table.schema.range_key_name)),
 		]
 	
-		return self.primary_key_delimeter.join(keys)
+		return self._meta.primary_key_delimeter.join(keys)
 
 	def obj_get_list(self, request=None, **k):
 		schema = self._meta.table.schema
@@ -182,7 +182,7 @@ class DynamoHashRangeResource(DynamoResource):
 			
 			#this class should be instantiated with two values..
 			if issubclass(range_key_condition, ConditionTwoArgs):
-				range_values['v1'], range_values['v2'] = [self.range_key_type(i) for i in range_key.split(self.primary_key_delimeter)]
+				range_values['v1'], range_values['v2'] = [self.range_key_type(i) for i in range_key.split(self._meta.primary_key_delimeter)]
 			else:
 				#setup the value that the class will be instantiated with
 				range_values['v1'] = self.range_key_type(range_key)
