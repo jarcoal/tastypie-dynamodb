@@ -16,7 +16,7 @@ class DynamoResource(Resource):
 
 	def __init__(self, *a, **k):
 		super(DynamoResource, self).__init__(*a, **k)
-		self.hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
+		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
 	#the tastypie pk regexes are a bit restrictive, so we override with a more liberal version
 	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<pk>[^\&\;\?]+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
@@ -108,7 +108,7 @@ class DynamoHashResource(DynamoResource):
 	Resource to use for Dynamo tables that only have a hash primary key.
 	"""
 	
-	_hydrate_pk_slug = lambda self, pk: { 'hash_key': self.hash_key_type(pk) }
+	_hydrate_pk_slug = lambda self, pk: { 'hash_key': self._hash_key_type(pk) }
 	_dehydrate_pk_slug = lambda self, obj: str(getattr(obj, self._meta.table.schema.hash_key_name))
 
 
@@ -120,7 +120,7 @@ class DynamoHashRangeResource(DynamoResource):
 	def __init__(self, *a, **k):
 		super(DynamoHashRangeResource, self).__init__(*a, **k)
 
-		self.range_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
+		self._range_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
 		self._meta.primary_key_delimeter = self._meta.primary_key_delimeter or ':'
 		
 		if self._meta.primary_key_delimeter in (';', '&', '?'):
@@ -134,8 +134,8 @@ class DynamoHashRangeResource(DynamoResource):
 		keys['hash_key'], keys['range_key'] = pk.split(self._meta.primary_key_delimeter)
 		
 		#make sure they're in the right format
-		keys['hash_key'] = self.hash_key_type(keys['hash_key'])
-		keys['range_key'] = self.range_key_type(keys['range_key'])
+		keys['hash_key'] = self._hash_key_type(keys['hash_key'])
+		keys['range_key'] = self._range_key_type(keys['range_key'])
 		
 		return keys
 
@@ -158,7 +158,7 @@ class DynamoHashRangeResource(DynamoResource):
 	
 		#get initial params
 		params = {
-			'hash_key': self.hash_key_type(hash_key),
+			'hash_key': self._hash_key_type(hash_key),
 			'request_limit': self._meta.limit,
 			'consistent_read': self._meta.consistent_read,
 			'scan_index_forward': self._meta.scan_index_forward if hasattr(self._meta, 'scan_index_forward') else True,
@@ -182,10 +182,10 @@ class DynamoHashRangeResource(DynamoResource):
 			
 			#this class should be instantiated with two values..
 			if issubclass(range_key_condition, ConditionTwoArgs):
-				range_values['v1'], range_values['v2'] = [self.range_key_type(i) for i in range_key.split(self._meta.primary_key_delimeter)]
+				range_values['v1'], range_values['v2'] = [self._range_key_type(i) for i in range_key.split(self._meta.primary_key_delimeter)]
 			else:
 				#setup the value that the class will be instantiated with
-				range_values['v1'] = self.range_key_type(range_key)
+				range_values['v1'] = self._range_key_type(range_key)
 			
 			#instantiate the range condition class
 			range_key_condition = range_key_condition(**range_values)
