@@ -5,7 +5,7 @@ from boto.dynamodb.condition import EQ, ConditionTwoArgs
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 
 from tastypie.resources import Resource
-from dynamopie.objects import DynamoObject
+from tastypie_dynamodb.objects import DynamoObject
 
 
 class DynamoResource(Resource):
