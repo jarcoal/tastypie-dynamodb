@@ -23,35 +23,16 @@ class DynamoKeyField(ApiField):
 
 
 class HashKeyField(DynamoKeyField):
-	"""
-	Hash Primary Key Field
-	"""
-
+	pass
 
 class RangeKeyField(DynamoKeyField):
-	"""
-	Range Primary Key Field
-	"""
-
+	pass
 
 class DynamoNumberMixin(object):
-	"""
-	Converts values to numbers
-	"""
-
-	def convert(self, value):
-		return None if value is None else int(value)
-
+	convert = lambda self, value: None if value is None else int(value)
 
 class DynamoStringMixin(object):
-	"""
-	Converts values to strings
-	"""
-
-	def convert(self, value):
-		return None if value is None else str(value)
-
-
+	convert = lambda self, value: None if value is None else str(value)
 
 class NumericHashKeyField(DynamoNumberMixin, HashKeyField):
 	pass
@@ -64,13 +45,3 @@ class NumericRangeKeyField(DynamoNumberMixin, RangeKeyField):
 
 class StringRangeKeyField(DynamoStringMixin, RangeKeyField):
 	pass
-	
-
-class TimestampField(DateTimeField):
-	help_text = 'A date & time as a timestamp.'
-	
-	def convert(self, value):
-		if value is None:
-			return None
-		
-		return datetime.datetime.utcfromtimestamp(value)
