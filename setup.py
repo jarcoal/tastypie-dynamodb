@@ -15,6 +15,7 @@ setup(
     install_requires=[
         'django >= 1.2',
         'django-tastypie >= 0.9.11',
+        'boto >= 2.2',
     ],
     include_package_data=True,
     classifiers=[
