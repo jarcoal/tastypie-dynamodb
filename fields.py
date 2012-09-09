@@ -1,10 +1,6 @@
-from tastypie.fields import ApiField, DateTimeField
-import datetime
+from tastypie.fields import ApiField
 
 class DynamoKeyField(ApiField):
-	"""
-	Root Dynamo Key Field
-	"""
 	def __init__(self, value=None, **k):
 		super(DynamoKeyField, self).__init__(**k)
 		self.value = value
@@ -18,7 +14,6 @@ class DynamoKeyField(ApiField):
 		elif bundle.request.method == 'PUT':
 			return None
 		
-		#fall into line
 		return super(DynamoKeyField, self).hydrate(bundle)
 
 
