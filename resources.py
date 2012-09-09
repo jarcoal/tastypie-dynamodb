@@ -24,7 +24,7 @@ class DynamoResource(Resource):
 	def get_resource_uri(self, bundle):
 		return self._build_reverse_url('api_dispatch_detail', kwargs={
 			'resource_name': self._meta.resource_name,
-			'pk': self.dehydrate_pk_slug(bundle.obj),
+			'pk': self._dehydrate_pk_slug(bundle.obj),
 			'api_name': self._meta.api_name,
 		})
 
@@ -61,7 +61,7 @@ class DynamoResource(Resource):
 		"""
 		Issues update command to dynamo, which will create if doesn't exist.
 		"""
-		return self._dynamo_update_or_insert(bundle, params=self.hydrate_pk_slug(k['pk']), update=True)
+		return self._dynamo_update_or_insert(bundle, params=self._hydrate_pk_slug(k['pk']), update=True)
 
 
 	def obj_create(self, bundle, request=None, **k):
@@ -77,7 +77,7 @@ class DynamoResource(Resource):
 		"""
 	
 		try:
-			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **self.hydrate_pk_slug(k['pk']))
+			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **self._hydrate_pk_slug(k['pk']))
 		except DynamoDBKeyNotFoundError:
 			raise Http404
 			
@@ -89,7 +89,7 @@ class DynamoResource(Resource):
 		Deletes an object in Dynamo
 		"""
 	
-		item = self._meta.table.new_item(**self.hydrate_pk_slug(k['pk']))
+		item = self._meta.table.new_item(**self._hydrate_pk_slug(k['pk']))
 		item.delete()
 
 
@@ -108,11 +108,8 @@ class DynamoHashResource(DynamoResource):
 	Resource to use for Dynamo tables that only have a hash primary key.
 	"""
 	
-	def hydrate_pk_slug(self, pk):
-		return { 'hash_key': self.hash_key_type(pk) }
-
-	def dehydrate_pk_slug(self, obj):
-		return str(getattr(obj, self._meta.table.schema.hash_key_name))
+	_hydrate_pk_slug = lambda self, pk: { 'hash_key': self.hash_key_type(pk) }
+	_dehydrate_pk_slug = lambda self, obj: str(getattr(obj, self._meta.table.schema.hash_key_name))
 
 
 class DynamoHashRangeResource(DynamoResource):
@@ -130,7 +127,7 @@ class DynamoHashRangeResource(DynamoResource):
 			raise Exception('"%" is not a valid delimeter.' % self.primary_key_delimeter)	
 
 
-	def hydrate_pk_slug(self, pk):
+	def _hydrate_pk_slug(self, pk):
 		keys = {}
 		
 		#extract the hash/range from the pk
@@ -142,7 +139,7 @@ class DynamoHashRangeResource(DynamoResource):
 		
 		return keys
 
-	def dehydrate_pk_slug(self, obj):
+	def _dehydrate_pk_slug(self, obj):
 		keys = [
 			str(getattr(obj, self._meta.table.schema.hash_key_name)),
 			str(getattr(obj, self._meta.table.schema.range_key_name)),
