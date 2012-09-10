@@ -37,8 +37,6 @@ class DynamoHashResource(Resource):
 
 	def __init__(self, *a, **k):
 		super(DynamoHashResource, self).__init__(*a, **k)
-		self._meta.consistent_read = getattr(self._meta, 'consistent_read', False)
-		self._meta.object_class = DynamoObject if self._meta.object_class is None else self._meta.object_class
 		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
 
