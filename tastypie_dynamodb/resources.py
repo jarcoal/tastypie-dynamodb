@@ -7,10 +7,15 @@ from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from tastypie.resources import DeclarativeMetaclass, Resource
 from tastypie_dynamodb.objects import DynamoObject
 
-import tastypie_dynamodb.fields as fields
+from tastypie_dynamodb import fields
 
 
 class DynamoDeclarativeMetaclass(DeclarativeMetaclass):
+	"""
+	Metaclass for Dynamo tables with a hash key.
+	This populates some defaults on the _meta attribute and fills in a hash field if necessary.
+	"""
+
 	def __new__(cls, name, bases, attrs):
 		#if no hash_key is specified
 		#if len([attr for attr in attrs.values() if isinstance(attr, fields.HashKeyField)]) == 0:
@@ -22,7 +27,7 @@ class DynamoDeclarativeMetaclass(DeclarativeMetaclass):
 			setattr(new_class._meta, 'consistent_read', False)
 
 		#ensure that object_class has a value
-		if not hasattr(new_class._meta, 'object_class'):
+		if getattr(new_class._meta, 'object_class', None) == None:
 			setattr(new_class._meta, 'object_class', DynamoObject)
 
 		#if the user is asking us to auto-build their primary keys
@@ -50,7 +55,7 @@ class DynamoHashResource(Resource):
 
 
 	#
-	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),]
+	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail')]
 	get_resource_uri = lambda self, bundle: self._build_reverse_url('api_dispatch_detail', kwargs=self.get_resource_uri_kwargs(bundle))
 	get_resource_uri_kwargs = lambda self, bundle: { 'api_name': self._meta.api_name, 'resource_name': self._meta.resource_name, 'hash_key': str(getattr(bundle.obj, self._meta.table.schema.hash_key_name)), }
 
@@ -120,6 +125,11 @@ class DynamoHashResource(Resource):
 
 
 class DynamoRangeDeclarativeMetaclass(DynamoDeclarativeMetaclass):
+	"""
+	Metaclass for Dynamo Tables with Hash/Range Primary Keys.
+	This fills in some defaults on the _meta attribute, as well as insert a range key field if necessary.
+	"""
+
 	def __new__(cls, name, bases, attrs):
 		new_class = super(DynamoRangeDeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
 
@@ -165,7 +175,7 @@ class DynamoHashRangeResource(DynamoHashResource):
 		return super(DynamoHashRangeResource, self).dispatch_detail(request, **k)
 
 
-	prepend_urls = lambda self: (url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)%s(?P<range_key>.+)/$' % (self._meta.resource_name, self._meta.primary_key_delimeter), self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),)
+	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)%s(?P<range_key>.+)/$' % (self._meta.resource_name, self._meta.primary_key_delimeter), self.wrap_view('dispatch_detail'), name='api_dispatch_detail')]
 
 	def get_resource_uri_kwargs(self, bundle):
 		resource_kwargs = super(DynamoHashRangeResource, self).get_resource_uri_kwargs(bundle)
