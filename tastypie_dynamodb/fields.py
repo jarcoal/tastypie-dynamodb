@@ -14,20 +14,20 @@ class HashKeyField(PrimaryKeyField):
 class RangeKeyField(PrimaryKeyField):
 	pass
 
-class DynamoNumberMixin(object):
+class NumberMixin(object):
 	convert = lambda self, value: None if value is None else int(value)
 
-class DynamoStringMixin(object):
+class StringMixin(object):
 	convert = lambda self, value: None if value is None else str(value)
 
-class NumericHashKeyField(DynamoNumberMixin, HashKeyField):
+class NumericHashKeyField(NumberMixin, HashKeyField):
 	pass
 
-class StringHashKeyField(DynamoStringMixin, HashKeyField):
+class StringHashKeyField(StringMixin, HashKeyField):
 	pass
 
-class NumericRangeKeyField(DynamoNumberMixin, RangeKeyField):
+class NumericRangeKeyField(NumberMixin, RangeKeyField):
 	pass
 
-class StringRangeKeyField(DynamoStringMixin, RangeKeyField):
+class StringRangeKeyField(StringMixin, RangeKeyField):
 	pass
