@@ -135,17 +135,35 @@ class DynamoHashResource(Resource):
 
 
 
+class DynamoRangeDeclarativeMetaclass(DynamoDeclarativeMetaclass):
+	def __new__(cls, name, bases, attrs):
+		meta = attrs.get('Meta')
+
+		#ensure a proper delimeter
+		if not hasattr(meta, 'primary_key_delimeter'):
+			setattr(meta, 'primary_key_delimeter', ':')
+
+		#invalid delimeter
+		elif getattr(meta, 'primary_key_delimeter') in (';', '&', '?'):
+			raise Exception('"%" is not a valid delimeter.' % getattr(meta, 'primary_key_delimeter'))
+
+		#if the user is asking us to auto-build their primary keys
+		if getattr(meta, 'build_primary_keys', False) == True:
+			schema = meta.table.schema
+			attrs[schema.range_key_name] = NumericRangeKeyField(attribute=schema.range_key_name) if schema.range_key_type == 'N' else StringRangeKeyField(attribute=schema.range_key_name)
+
+		return super(DynamoRangeDeclarativeMetaclass, self).__new__(cls, name, bases, attrs)
+
+
+
 class DynamoHashRangeResource(DynamoHashResource):
 	"""Resource to use for Dynamo tables that have hash and range keys."""
 
+	__metaclass__ = DynamoRangeDeclarativeMetaclass
+
 	def __init__(self, *a, **k):
 		super(DynamoHashRangeResource, self).__init__(*a, **k)
-
 		self._range_key_type = int if self._meta.table.schema.range_key_type == 'N' else str
-		self._meta.primary_key_delimeter = self._meta.primary_key_delimeter or ':'
-		
-		if self._meta.primary_key_delimeter in (';', '&', '?'):
-			raise Exception('"%" is not a valid delimeter.' % self._meta.primary_key_delimeter)
 
 
 	def dispatch_detail(self, request, **k):
