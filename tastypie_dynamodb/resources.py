@@ -120,6 +120,14 @@ class DynamoRangeDeclarativeMetaclass(DynamoDeclarativeMetaclass):
 	def __new__(cls, name, bases, attrs):
 		meta = attrs.get('Meta')
 
+		#ensure scan index forward
+		if not hasattr(meta, 'scan_index_forward'):
+			setattr(meta, 'scan_index_forward', True)
+
+		#ensure range key condition
+		if not hasattr(meta, 'range_key_condition'):
+			setattr(meta, 'range_key_condition', EQ)
+
 		#ensure a proper delimeter
 		if not hasattr(meta, 'primary_key_delimeter'):
 			setattr(meta, 'primary_key_delimeter', ':')
@@ -176,7 +184,7 @@ class DynamoHashRangeResource(DynamoHashResource):
 			'hash_key': self._hash_key_type(hash_key),
 			'request_limit': self._meta.limit,
 			'consistent_read': self._meta.consistent_read,
-			'scan_index_forward': self._meta.scan_index_forward if hasattr(self._meta, 'scan_index_forward') else True,
+			'scan_index_forward': self._meta.scan_index_forward,
 		}
 		
 		
@@ -186,7 +194,7 @@ class DynamoHashRangeResource(DynamoHashResource):
 		#if a range key value was specified, prepare
 		if range_key:
 			#get the range key condition
-			range_key_condition = self._meta.range_key_condition if hasattr(self._meta, 'range_key_condition') else EQ
+			range_key_condition = self._meta.range_key_condition
 
 			#this is an instance, with default values we need to override.  convert back to class for re-instantiation.
 			if not inspect.isclass(range_key_condition):
