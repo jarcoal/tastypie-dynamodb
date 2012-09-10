@@ -8,29 +8,24 @@ from tastypie.resources import Resource
 from tastypie_dynamodb.objects import DynamoObject
 
 
-class DynamoResource(Resource):
-	"""
-	Root Dynamo Resource.  This should be treated as abstract.
-	Inherit from DynamoHashResource or DynamoHashRangeResource.
-	"""
+class DynamoHashResource(DynamoHashResource):
+	"""Resource to use for Dynamo tables that only have a hash primary key."""
 
 	def __init__(self, *a, **k):
-		super(DynamoResource, self).__init__(*a, **k)
+		super(DynamoHashResource, self).__init__(*a, **k)
 		self._meta.consistent_read = getattr(self._meta, 'consistent_read', False)
 		self._meta.object_class = DynamoObject if self._meta.object_class is None else self._meta.object_class
 		self._hash_key_type = int if self._meta.table.schema.hash_key_type == 'N' else str
 
 
 	def dispatch_detail(self, request, **k):
-		"""
-		Ensure that the hash_key is received in the correct type
-		"""
+		"""Ensure that the hash_key is received in the correct type"""
 		k['hash_key'] = self._hash_key_type(k['hash_key'])
-		return super(DynamoResource, self).dispatch_detail(request, **k)
+		return super(DynamoHashResource, self).dispatch_detail(request, **k)
 
 
 	def hydrate(self, *a, **k):
-		bundle = super(DynamoResource, self).hydrate(*a, **k)
+		bundle = super(DynamoHashResource, self).hydrate(*a, **k)
 
 		#make sure we get the hash key from the request
 		hash_key_name = self._meta.table.schema.hash_key_name
@@ -45,7 +40,7 @@ class DynamoResource(Resource):
 
 
 	# def dehydrate(self, *a, **k):
-	# 	bundle = super(DynamoResource, self).dehydrate(*a, **k)
+	# 	bundle = super(DynamoHashResource, self).dehydrate(*a, **k)
 	# 	return bundle
 
 	#
@@ -81,24 +76,17 @@ class DynamoResource(Resource):
 
 
 	def obj_update(self, bundle, request=None, **k):
-		"""
-		Issues update command to dynamo, which will create if doesn't exist.
-		"""
+		"""Issues update command to dynamo, which will create if doesn't exist."""
 		return self._dynamo_update_or_insert(bundle, primary_keys=k)
 
 
 	def obj_create(self, bundle, request=None, **k):
-		"""
-		Creates an object in Dynamo
-		"""
+		"""Creates an object in Dynamo"""
 		return self._dynamo_update_or_insert(bundle)
 
 
 	def obj_get(self, request=None, **k):
-		"""
-		Gets an object in Dynamo
-		"""
-
+		"""Gets an object in Dynamo"""
 		try:
 			item = self._meta.table.get_item(consistent_read=self._meta.consistent_read, **k)
 		except DynamoDBKeyNotFoundError:
@@ -108,9 +96,7 @@ class DynamoResource(Resource):
 
 
 	def obj_delete(self, request=None, **k):
-		"""
-		Deletes an object in Dynamo
-		"""
+		"""Deletes an object in Dynamo"""
 	
 		item = self._meta.table.new_item(**k)
 		item.delete()
@@ -126,16 +112,9 @@ class DynamoResource(Resource):
 		pass
 
 
-class DynamoHashResource(DynamoResource):
-	"""
-	Resource to use for Dynamo tables that only have a hash primary key.
-	"""
 
-
-class DynamoHashRangeResource(DynamoResource):
-	"""
-	Resource to use for Dynamo tables that have hash and range keys.
-	"""
+class DynamoHashRangeResource(DynamoHashResource):
+	"""Resource to use for Dynamo tables that have hash and range keys."""
 
 	def __init__(self, *a, **k):
 		super(DynamoHashRangeResource, self).__init__(*a, **k)
@@ -148,9 +127,8 @@ class DynamoHashRangeResource(DynamoResource):
 
 
 	def dispatch_detail(self, request, **k):
-		"""
-		Ensure that the range_key is received in the correct type
-		"""
+		"""Ensure that the range_key is received in the correct type"""
+
 		k['range_key'] = self._range_key_type(k['range_key'])
 		return super(DynamoHashRangeResource, self).dispatch_detail(request, **k)
 
