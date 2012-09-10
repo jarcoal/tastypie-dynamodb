@@ -8,7 +8,7 @@ from tastypie.resources import Resource
 from tastypie_dynamodb.objects import DynamoObject
 
 
-class DynamoHashResource(DynamoHashResource):
+class DynamoHashResource(Resource):
 	"""Resource to use for Dynamo tables that only have a hash primary key."""
 
 	def __init__(self, *a, **k):
