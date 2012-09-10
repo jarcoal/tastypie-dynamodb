@@ -4,12 +4,36 @@ from django.http import Http404
 from boto.dynamodb.condition import EQ, ConditionTwoArgs
 from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 
-from tastypie.resources import Resource
+from tastypie.resources import DeclarativeMetaclass, Resource
 from tastypie_dynamodb.objects import DynamoObject
+
+from tastypie_dynamodb.fields import NumericHashKeyField, StringHashKeyField, NumericRangeKeyField, StringRangeKeyField
+
+
+class DynamoDeclarativeMetaclass(DeclarativeMetaclass):
+	def __new__(cls, name, bases, attrs):
+		meta = attrs.get('Meta')
+
+		#ensure that consistent_read has a value
+		if not hasattr(meta, 'consistent_read'):
+			setattr(meta, 'consistent_read', False)
+
+		#ensure that object_class has a value
+		if not hasattr(meta, 'object_class'):
+			setattr(meta, 'object_class', DynamoObject)
+
+		#if the user is asking us to auto-build their primary keys
+		if getattr(meta, 'build_primary_keys', False) == True:
+			schema = meta.table.schema
+			attrs[schema.hash_key_name] = NumericHashKeyField(attribute=schema.hash_key_name) if schema.hash_key_type == 'N' else StringHashKeyField(attribute=schema.hash_key_name)
+
+		return super(DynamoDeclarativeMetaclass, self).__new__(cls, name, bases, attrs)
 
 
 class DynamoHashResource(Resource):
 	"""Resource to use for Dynamo tables that only have a hash primary key."""
+
+	__metaclass__ = DynamoDeclarativeMetaclass
 
 	def __init__(self, *a, **k):
 		super(DynamoHashResource, self).__init__(*a, **k)
