@@ -7,27 +7,30 @@ from boto.dynamodb.exceptions import DynamoDBKeyNotFoundError
 from tastypie.resources import DeclarativeMetaclass, Resource
 from tastypie_dynamodb.objects import DynamoObject
 
-from tastypie_dynamodb.fields import NumericHashKeyField, StringHashKeyField, NumericRangeKeyField, StringRangeKeyField
+import tastypie_dynamodb.fields as fields
 
 
 class DynamoDeclarativeMetaclass(DeclarativeMetaclass):
 	def __new__(cls, name, bases, attrs):
-		meta = attrs.get('Meta')
+		#if no hash_key is specified
+		#if len([attr for attr in attrs.values() if isinstance(attr, fields.HashKeyField)]) == 0:
+
+		new_class = super(DynamoDeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
 
 		#ensure that consistent_read has a value
-		if not hasattr(meta, 'consistent_read'):
-			setattr(meta, 'consistent_read', False)
+		if not hasattr(new_class._meta, 'consistent_read'):
+			setattr(new_class._meta, 'consistent_read', False)
 
 		#ensure that object_class has a value
-		if not hasattr(meta, 'object_class'):
-			setattr(meta, 'object_class', DynamoObject)
+		if not hasattr(new_class._meta, 'object_class'):
+			setattr(new_class._meta, 'object_class', DynamoObject)
 
 		#if the user is asking us to auto-build their primary keys
-		if getattr(meta, 'build_primary_keys', False) == True:
-			schema = meta.table.schema
-			attrs[schema.hash_key_name] = NumericHashKeyField(attribute=schema.hash_key_name) if schema.hash_key_type == 'N' else StringHashKeyField(attribute=schema.hash_key_name)
+		if getattr(new_class._meta, 'build_primary_keys', False) == True:
+			schema = new_class._meta.table.schema
+			new_class.base_fields[schema.hash_key_name] = fields.NumericHashKeyField(attribute=schema.hash_key_name) if schema.hash_key_type == 'N' else fields.StringHashKeyField(attribute=schema.hash_key_name)
 
-		return super(DynamoDeclarativeMetaclass, self).__new__(cls, name, bases, attrs)
+		return new_class
 
 
 class DynamoHashResource(Resource):
@@ -118,30 +121,30 @@ class DynamoHashResource(Resource):
 
 class DynamoRangeDeclarativeMetaclass(DynamoDeclarativeMetaclass):
 	def __new__(cls, name, bases, attrs):
-		meta = attrs.get('Meta')
+		new_class = super(DynamoRangeDeclarativeMetaclass, cls).__new__(cls, name, bases, attrs)
 
 		#ensure scan index forward
-		if not hasattr(meta, 'scan_index_forward'):
-			setattr(meta, 'scan_index_forward', True)
+		if not hasattr(new_class._meta, 'scan_index_forward'):
+			setattr(new_class._meta, 'scan_index_forward', True)
 
 		#ensure range key condition
-		if not hasattr(meta, 'range_key_condition'):
-			setattr(meta, 'range_key_condition', EQ)
+		if not hasattr(new_class._meta, 'range_key_condition'):
+			setattr(new_class._meta, 'range_key_condition', EQ)
 
 		#ensure a proper delimeter
-		if not hasattr(meta, 'primary_key_delimeter'):
-			setattr(meta, 'primary_key_delimeter', ':')
+		if not hasattr(new_class._meta, 'primary_key_delimeter'):
+			setattr(new_class._meta, 'primary_key_delimeter', ':')
 
 		#invalid delimeter
-		elif getattr(meta, 'primary_key_delimeter') in (';', '&', '?'):
-			raise Exception('"%" is not a valid delimeter.' % getattr(meta, 'primary_key_delimeter'))
+		elif getattr(new_class._meta, 'primary_key_delimeter') in (';', '&', '?'):
+			raise Exception('"%" is not a valid delimeter.' % getattr(new_class._meta, 'primary_key_delimeter'))
 
 		#if the user is asking us to auto-build their primary keys
-		if getattr(meta, 'build_primary_keys', False) == True:
-			schema = meta.table.schema
-			attrs[schema.range_key_name] = NumericRangeKeyField(attribute=schema.range_key_name) if schema.range_key_type == 'N' else StringRangeKeyField(attribute=schema.range_key_name)
+		if getattr(new_class._meta, 'build_primary_keys', False) == True:
+			schema = new_class._meta.table.schema
+			new_class.base_fields[schema.range_key_name] = fields.NumericRangeKeyField(attribute=schema.range_key_name) if schema.range_key_type == 'N' else fields.StringRangeKeyField(attribute=schema.range_key_name)
 
-		return super(DynamoRangeDeclarativeMetaclass, self).__new__(cls, name, bases, attrs)
+		return new_class
 
 
 
