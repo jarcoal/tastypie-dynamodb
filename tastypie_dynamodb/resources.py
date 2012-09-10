@@ -46,25 +46,6 @@ class DynamoHashResource(Resource):
 		return super(DynamoHashResource, self).dispatch_detail(request, **k)
 
 
-	def hydrate(self, *a, **k):
-		bundle = super(DynamoHashResource, self).hydrate(*a, **k)
-
-		#make sure we get the hash key from the request
-		hash_key_name = self._meta.table.schema.hash_key_name
-		hash_key_value = bundle.data.get(hash_key_name, None)
-
-		if hash_key_value:
-			hash_key_value = _hash_key_type(hash_key_value)
-
-		setattr(bundle.obj, hash_key_name, hash_key_value)
-
-		return bundle
-
-
-	# def dehydrate(self, *a, **k):
-	# 	bundle = super(DynamoHashResource, self).dehydrate(*a, **k)
-	# 	return bundle
-
 	#
 	prepend_urls = lambda self: [url(r'^(?P<resource_name>%s)/(?P<hash_key>.+)/$' % self._meta.resource_name, self.wrap_view('dispatch_detail'), name='api_dispatch_detail'),]
 	get_resource_uri = lambda self, bundle: self._build_reverse_url('api_dispatch_detail', kwargs=self.get_resource_uri_kwargs(bundle))
@@ -179,15 +160,6 @@ class DynamoHashRangeResource(DynamoHashResource):
 		resource_kwargs = super(DynamoHashRangeResource, self).get_resource_uri_kwargs(bundle)
 		resource_kwargs['range_key'] = str(getattr(bundle.obj, self._meta.table.schema.range_key_name))
 		return resource_kwargs
-
-	def full_hydrate(self, *a, **k):
-		bundle = super(DynamoHashRangeResource, self).full_hydrate(*a, **k)
-
-		#make sure we get the range key from the request
-		range_key_name = self._meta.table.schema.range_key_name
-		setattr(bundle.obj, range_key_name, bundle.data.get(range_key_name, None))
-
-		return bundle
 
 
 	def obj_get_list(self, request=None, **k):
